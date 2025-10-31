@@ -11,7 +11,9 @@ export default defineConfig({
       external: [
         '@google/genai',
         'react',
-        'react-dom'
+        'react-dom',
+        'react/jsx-runtime', // Añadido para resolver el error de build
+        'react-dom/client'   // Añadido preventivamente ya que se usa en index.tsx
       ],
     },
   },
