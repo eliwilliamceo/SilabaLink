@@ -8,7 +8,7 @@ const INITIAL_TIME = 60;
 const TIME_BONUS_PER_WORD = 3;
 const LEADERBOARD_SIZE = 10;
 
-export const useGameLogic = (username: string | null) => {
+export const useGameLogic = (username: string | null, onApiKeyError: () => void) => {
     const [status, setStatus] = useState<GameStatus>('INITIAL');
     const [timeRemaining, setTimeRemaining] = useState(INITIAL_TIME);
     const [score, setScore] = useState(0);
@@ -47,6 +47,25 @@ export const useGameLogic = (username: string | null) => {
         });
     }, [unlockedAchievements]);
 
+    const handleError = useCallback((error: unknown, defaultMessage: string): string => {
+        let displayMessage = defaultMessage;
+        if (error instanceof Error) {
+            // Specific check for invalid API key after selection, which can happen in a race condition.
+            if (error.message.includes("Requested entity was not found")) {
+                onApiKeyError();
+                // Return a message, although the UI will change immediately.
+                return "La clave API no es válida. Por favor, selecciona una clave de nuevo.";
+            }
+            // General API key configuration error.
+            if (error.message.toLowerCase().includes("api key")) {
+                displayMessage = "Error de configuración: La clave API de Gemini no está disponible o no es válida.";
+            } else {
+                displayMessage = `Error: ${error.message}`;
+            }
+        }
+        return displayMessage;
+    }, [onApiKeyError]);
+
     const startGame = useCallback(async () => {
         setStatus('VALIDATING');
         setIsHighScore(false);
@@ -63,18 +82,11 @@ export const useGameLogic = (username: string | null) => {
             setTimeRemaining(INITIAL_TIME);
             setStatus('PLAYING');
         } catch (error) {
-            let displayMessage = "No se pudo iniciar el juego. Inténtalo de nuevo.";
-            if (error instanceof Error) {
-                if (error.message.includes("API_KEY")) {
-                    displayMessage = "Error de configuración: La clave API de Gemini no está disponible.";
-                } else {
-                    displayMessage = `Error al iniciar: ${error.message}`;
-                }
-            }
+            const displayMessage = handleError(error, "No se pudo iniciar el juego. Inténtalo de nuevo.");
             setErrorMessage(displayMessage);
             setStatus('INITIAL');
         }
-    }, []);
+    }, [handleError]);
     
     const handleGameOver = useCallback(() => {
         if (timerRef.current) clearInterval(timerRef.current);
@@ -186,19 +198,12 @@ export const useGameLogic = (username: string | null) => {
             checkAchievements(newScore, newStreak, trimmedWord);
             setStatus('PLAYING');
         } catch (error) {
-             let displayMessage = "Error al validar la palabra.";
-             if (error instanceof Error) {
-                if (error.message.includes("API_KEY")) {
-                    displayMessage = "Error de conexión. Revisa la configuración.";
-                } else {
-                    displayMessage = `Error: ${error.message}`;
-                }
-            }
+             const displayMessage = handleError(error, "Error al validar la palabra.");
             setErrorMessage(displayMessage);
             setStatus('PLAYING'); // Return to playing state
         }
 
-    }, [lastSyllable, score, streak, usedWords, checkAchievements]);
+    }, [lastSyllable, score, streak, usedWords, checkAchievements, handleError]);
     
     return {
         status,

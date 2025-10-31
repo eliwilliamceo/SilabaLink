@@ -10,9 +10,13 @@ import LoginScreen from './components/LoginScreen';
 import { getCurrentUser, saveCurrentUser, clearCurrentUser } from './utils/storage';
 
 const App: React.FC = () => {
-    const [appState, setAppState] = useState<'SPLASH' | 'LOGIN' | 'GAME'>('SPLASH');
+    const [appState, setAppState] = useState<'SPLASH' | 'API_KEY' | 'LOGIN' | 'GAME'>('SPLASH');
     const [currentUser, setCurrentUser] = useState<string | null>(null);
     
+    const handleApiKeyError = () => {
+        setAppState('API_KEY');
+    };
+
     const {
         status,
         timeRemaining,
@@ -27,24 +31,46 @@ const App: React.FC = () => {
         achievementNotification,
         unlockedAchievements,
         isHighScore,
-    } = useGameLogic(currentUser);
+    } = useGameLogic(currentUser, handleApiKeyError);
     
     const [showAchievements, setShowAchievements] = useState(false);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
 
     useEffect(() => {
-        const user = getCurrentUser();
-        const splashTimer = setTimeout(() => {
+        const checkApiKeyAndUser = async () => {
+            // @ts-ignore - aistudio is available in the execution environment.
+            const hasApiKey = await window.aistudio.hasSelectedApiKey();
+            if (!hasApiKey) {
+                setAppState('API_KEY');
+                return;
+            }
+            
+            const user = getCurrentUser();
             if (user) {
                 setCurrentUser(user);
                 setAppState('GAME');
             } else {
                 setAppState('LOGIN');
             }
+        };
+        
+        const splashTimer = setTimeout(() => {
+            checkApiKeyAndUser();
         }, 2500);
 
         return () => clearTimeout(splashTimer);
     }, []);
+
+    const handleKeySelected = () => {
+        // Assume key is selected, move to next state.
+        const user = getCurrentUser();
+        if (user) {
+            setCurrentUser(user);
+            setAppState('GAME');
+        } else {
+            setAppState('LOGIN');
+        }
+    };
 
     const handleLogin = (name: string) => {
         setCurrentUser(name);
@@ -68,21 +94,56 @@ const App: React.FC = () => {
         return <SplashScreen />;
     }
 
+    if (appState === 'API_KEY') {
+        return (
+            <div className="login-screen">
+                <div className="login-wrapper">
+                    <header>
+                        <h1 className="app-title">
+                            Sílaba<span className="app-title--highlight">Link</span>
+                        </h1>
+                        <p className="user-greeting" style={{marginTop: '1rem', lineHeight: '1.5'}}>
+                            Para poder comunicarnos con el modelo de IA de Gemini, necesitamos que selecciones una clave API.
+                        </p>
+                    </header>
+                    <div className="login-form">
+                        <button
+                            onClick={async () => {
+                                // @ts-ignore - aistudio is available in the execution environment.
+                                await window.aistudio.openSelectKey();
+                                handleKeySelected();
+                            }}
+                            className="btn btn-primary"
+                        >
+                            Seleccionar Clave API
+                        </button>
+                         <p style={{marginTop: '1.5rem', fontSize: '0.875rem', color: 'var(--color-slate-400)', textAlign: 'center', lineHeight: '1.5'}}>
+                             Asegúrate de tener la facturación habilitada para tu proyecto. <br/>
+                             <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" style={{color: 'var(--color-cyan-400)', textDecoration: 'underline'}}>
+                                 Más información sobre la facturación
+                             </a>
+                         </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     if (appState === 'LOGIN') {
         return <LoginScreen onLogin={handleLogin} />;
     }
 
     return (
-        <div className="bg-slate-900 text-white min-h-screen flex flex-col items-center justify-center p-4 antialiased">
-            <div className="w-full max-w-md mx-auto">
-                <header className="text-center mb-6">
-                    <h1 className="text-4xl md:text-5xl font-bold text-cyan-400 tracking-wider">
-                        Sílaba<span className="text-pink-500">Link</span>
+        <div className="app-container">
+            <div className="game-wrapper">
+                <header className="app-header">
+                    <h1 className="app-title">
+                        Sílaba<span className="app-title--highlight">Link</span>
                     </h1>
-                     <div className="flex items-center justify-center mt-2 space-x-2">
-                        <p className="text-slate-400">Bienvenido, <span className="font-bold text-cyan-300">{currentUser}</span>.</p>
-                        <button onClick={handleLogout} className="text-slate-500 hover:text-pink-500 transition-colors" title="Cambiar de usuario">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                     <div className="user-info">
+                        <p className="user-greeting">Bienvenido, <span className="username">{currentUser}</span>.</p>
+                        <button onClick={handleLogout} className="logout-button" title="Cambiar de usuario">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                             </svg>
                         </button>
@@ -91,29 +152,29 @@ const App: React.FC = () => {
 
                 <main>
                     {status === 'INITIAL' && (
-                        <div className="text-center space-y-4 animate-fade-in-up">
+                        <div className="initial-screen animate-fade-in-up">
                             <button 
                                 onClick={startGame}
-                                className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold py-3 px-8 rounded-lg text-xl transition-transform transform hover:scale-105 shadow-lg shadow-cyan-500/30"
+                                className="btn btn-primary"
                             >
                                 Empezar a Jugar
                             </button>
-                             <div className="flex space-x-4">
+                             <div className="button-group">
                                 <button 
                                     onClick={() => setShowAchievements(true)}
-                                    className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                                    className="btn btn-secondary"
                                 >
                                     Logros
                                 </button>
                                 <button 
                                     onClick={() => setShowLeaderboard(true)}
-                                    className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                                    className="btn btn-secondary"
                                 >
                                     Mejores Puntuaciones
                                 </button>
                             </div>
                             {errorMessage && (
-                                <p className="text-red-400 text-center mt-4 font-semibold">{errorMessage}</p>
+                                <p className="error-message">{errorMessage}</p>
                             )}
                         </div>
                     )}

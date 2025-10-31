@@ -1,26 +1,25 @@
 import { GoogleGenAI, Type } from '@google/genai';
 
 const model = 'gemini-2.5-flash';
-let ai: GoogleGenAI | null = null;
 
 /**
- * Inicializa y devuelve el cliente de GoogleGenAI.
- * Lanza un error si la VITE_API_KEY no está configurada.
+ * Crea y devuelve una nueva instancia del cliente de GoogleGenAI.
+ * Siempre crea una nueva instancia para asegurar que se usa la clave API más reciente
+ * seleccionada en el entorno de ejecución.
+ * Asume que process.env.API_KEY está disponible en el entorno.
  */
 const getAiClient = (): GoogleGenAI => {
-    if (ai) return ai;
-    if (!import.meta.env.VITE_API_KEY) {
-        // Este error será capturado por useGameLogic y mostrado al usuario.
-        throw new Error("API_KEY not configured.");
-    }
     try {
-        ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
+        // The guide recommends creating a new instance right before an API call
+        // to ensure it uses the most up-to-date API key.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         return ai;
     } catch (error) {
         console.error("Fatal Error initializing GoogleGenAI client:", error);
-        throw error;
+        throw new Error("No se pudo inicializar el cliente de IA. Comprueba la configuración de la clave API.");
     }
 };
+
 
 // --- FUNCIONES DE LA API DE GEMINI ---
 
