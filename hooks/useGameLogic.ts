@@ -1,0 +1,218 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { getSyllables, validateWord, getStartingWord } from '../services/geminiService';
+import type { GameStatus, Achievement, LeaderboardEntry } from '../types';
+import { allAchievements } from '../data/achievements';
+import { getLeaderboard, saveToLeaderboard, getUnlockedAchievements, saveUnlockedAchievements } from '../utils/storage';
+
+const INITIAL_TIME = 60;
+const TIME_BONUS_PER_WORD = 3;
+const LEADERBOARD_SIZE = 10;
+
+export const useGameLogic = (username: string | null) => {
+    const [status, setStatus] = useState<GameStatus>('INITIAL');
+    const [timeRemaining, setTimeRemaining] = useState(INITIAL_TIME);
+    const [score, setScore] = useState(0);
+    const [streak, setStreak] = useState(0);
+    const [wordChain, setWordChain] = useState<string[]>([]);
+    const [usedWords, setUsedWords] = useState<Set<string>>(new Set());
+    const [lastSyllable, setLastSyllable] = useState<string>('');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [achievementNotification, setAchievementNotification] = useState<Achievement | null>(null);
+    const [unlockedAchievements, setUnlockedAchievements] = useState<Set<string>>(new Set());
+    const [isHighScore, setIsHighScore] = useState(false);
+
+    const timerRef = useRef<number | null>(null);
+    const notificationTimeoutRef = useRef<number | null>(null);
+
+     useEffect(() => {
+        setUnlockedAchievements(getUnlockedAchievements());
+    }, []);
+
+    const checkAchievements = useCallback((currentScore: number, currentStreak: number, word: string) => {
+        allAchievements.forEach(achievement => {
+            if (!unlockedAchievements.has(achievement.id) && achievement.check(currentScore, currentStreak, word)) {
+                // FIX: Explicitly type the new Set as Set<string> to avoid incorrect type inference.
+                const newUnlocked = new Set<string>(unlockedAchievements).add(achievement.id);
+                setUnlockedAchievements(newUnlocked);
+                saveUnlockedAchievements(newUnlocked);
+
+                setAchievementNotification(achievement);
+                if (notificationTimeoutRef.current) {
+                    clearTimeout(notificationTimeoutRef.current);
+                }
+                notificationTimeoutRef.current = window.setTimeout(() => {
+                    setAchievementNotification(null);
+                }, 3000);
+            }
+        });
+    }, [unlockedAchievements]);
+
+    const startGame = useCallback(async () => {
+        setStatus('VALIDATING');
+        setIsHighScore(false);
+        setErrorMessage(null);
+        try {
+            const startWord = await getStartingWord();
+            const syllables = await getSyllables(startWord);
+
+            setWordChain([startWord]);
+            setUsedWords(new Set([startWord.toLowerCase()]));
+            setLastSyllable(syllables[syllables.length - 1]);
+            setScore(0);
+            setStreak(0);
+            setTimeRemaining(INITIAL_TIME);
+            setStatus('PLAYING');
+        } catch (error) {
+            let displayMessage = "No se pudo iniciar el juego. Inténtalo de nuevo.";
+            if (error instanceof Error) {
+                if (error.message.includes("API_KEY")) {
+                    displayMessage = "Error de configuración: La clave API de Gemini no está disponible.";
+                } else {
+                    displayMessage = `Error al iniciar: ${error.message}`;
+                }
+            }
+            setErrorMessage(displayMessage);
+            setStatus('INITIAL');
+        }
+    }, []);
+    
+    const handleGameOver = useCallback(() => {
+        if (timerRef.current) clearInterval(timerRef.current);
+        setStatus('GAME_OVER');
+
+        const leaderboard = getLeaderboard();
+        const lowestHighScore = leaderboard.length < LEADERBOARD_SIZE ? 0 : leaderboard[leaderboard.length - 1].score;
+
+        if (score > lowestHighScore) {
+            setIsHighScore(true);
+            if (username) {
+                saveToLeaderboard({ name: username, score });
+            }
+        } else {
+            setIsHighScore(false);
+        }
+        checkAchievements(score, streak, '');
+    }, [score, streak, checkAchievements, username]);
+
+
+    useEffect(() => {
+        if (status === 'PLAYING' && timeRemaining <= 0) {
+             handleGameOver();
+        }
+    }, [timeRemaining, status, handleGameOver]);
+
+    useEffect(() => {
+        if (status === 'PLAYING') {
+            timerRef.current = window.setInterval(() => {
+                setTimeRemaining(prev => prev - 1);
+            }, 1000);
+        } else {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+        }
+
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+             if (notificationTimeoutRef.current) {
+                clearTimeout(notificationTimeoutRef.current);
+            }
+        };
+    }, [status]);
+    
+    const resetGame = useCallback(() => {
+        if (timerRef.current) clearInterval(timerRef.current);
+        setStatus('INITIAL');
+        setTimeRemaining(INITIAL_TIME);
+        setScore(0);
+        setStreak(0);
+        setWordChain([]);
+        setUsedWords(new Set());
+        setLastSyllable('');
+        setErrorMessage(null);
+        setIsHighScore(false);
+    }, []);
+
+    const handleSubmitWord = useCallback(async (word: string) => {
+        const trimmedWord = word.trim().toLowerCase();
+        if (!trimmedWord) return;
+
+        setErrorMessage(null);
+        setStatus('VALIDATING');
+
+        if (usedWords.has(trimmedWord)) {
+            setErrorMessage('¡Palabra repetida!');
+            setStreak(0);
+            setStatus('PLAYING');
+            return;
+        }
+        
+        try {
+            const isValid = await validateWord(trimmedWord);
+            if (!isValid) {
+                setErrorMessage('¡Esa palabra no existe!');
+                setStreak(0);
+                setStatus('PLAYING');
+                return;
+            }
+
+            const syllables = await getSyllables(trimmedWord);
+            if (syllables.length < 2) {
+                setErrorMessage('La palabra debe tener al menos 2 sílabas.');
+                setStreak(0);
+                setStatus('PLAYING');
+                return;
+            }
+
+            const firstSyllable = syllables[0];
+            if (firstSyllable.toLowerCase() !== lastSyllable.toLowerCase()) {
+                setErrorMessage(`La palabra debe empezar con "${lastSyllable}"`);
+                setStreak(0);
+                setStatus('PLAYING');
+                return;
+            }
+
+            const newStreak = streak + 1;
+            const newScore = score + 10 + (trimmedWord.length > 5 ? 5 : 0) + newStreak * 2;
+            
+            setScore(newScore);
+            setStreak(newStreak);
+            setTimeRemaining(prev => prev + TIME_BONUS_PER_WORD);
+            setWordChain(prev => [...prev, trimmedWord]);
+            setUsedWords(prev => new Set(prev).add(trimmedWord));
+            setLastSyllable(syllables[syllables.length - 1]);
+            checkAchievements(newScore, newStreak, trimmedWord);
+            setStatus('PLAYING');
+        } catch (error) {
+             let displayMessage = "Error al validar la palabra.";
+             if (error instanceof Error) {
+                if (error.message.includes("API_KEY")) {
+                    displayMessage = "Error de conexión. Revisa la configuración.";
+                } else {
+                    displayMessage = `Error: ${error.message}`;
+                }
+            }
+            setErrorMessage(displayMessage);
+            setStatus('PLAYING'); // Return to playing state
+        }
+
+    }, [lastSyllable, score, streak, usedWords, checkAchievements]);
+    
+    return {
+        status,
+        timeRemaining,
+        score,
+        streak,
+        wordChain,
+        lastSyllable,
+        errorMessage,
+        startGame,
+        handleSubmitWord,
+        resetGame,
+        achievementNotification,
+        unlockedAchievements,
+        isHighScore,
+    };
+};

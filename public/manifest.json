@@ -1,0 +1,9 @@
+{
+  "short_name": "SílabaLink",
+  "name": "SílabaLink - Juego de Palabras",
+  "description": "Un juego de palabras encadenadas por sílabas. Conecta palabras usando la última sílaba de una con la primera de la siguiente, compite contra el reloj y consigue la racha más larga.",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a"
+}
