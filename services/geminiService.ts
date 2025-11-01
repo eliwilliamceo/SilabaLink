@@ -3,44 +3,16 @@ import { GoogleGenAI, Type } from '@google/genai';
 const model = 'gemini-2.5-flash';
 
 /**
- * Obtiene de forma segura la clave API de Gemini desde las variables de entorno.
- * Soporta el método de Vite (`import.meta.env`) para despliegues en Vercel,
- * y el método estándar de AI Studio (`process.env`).
- * @returns La clave API o `undefined` si no se encuentra.
- */
-const getApiKey = (): string | undefined => {
-    // Entorno Vite (usado en Vercel)
-    if (typeof import.meta.env !== 'undefined' && import.meta.env.VITE_GEMINI_API_KEY) {
-        return import.meta.env.VITE_GEMINI_API_KEY;
-    }
-    // Entorno AI Studio o similar que define process.env
-    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-        return process.env.API_KEY;
-    }
-    return undefined;
-};
-
-
-/**
  * Crea y devuelve una nueva instancia del cliente de GoogleGenAI.
  * Siempre crea una nueva instancia para asegurar que se usa la clave API más reciente
- * disponible en el entorno de ejecución.
+ * seleccionada en el entorno de ejecución.
+ * Asume que process.env.API_KEY está disponible en el entorno.
  */
 const getAiClient = (): GoogleGenAI => {
-    const apiKey = getApiKey();
-
-    if (!apiKey) {
-         throw new Error("La clave API de Gemini no está configurada. Asegúrate de que VITE_GEMINI_API_KEY (para Vercel) o API_KEY (para ejecución local) estén disponibles en las variables de entorno.");
-    }
-
-    try {
-        // Se crea una nueva instancia en cada llamada para usar la clave más actualizada.
-        const ai = new GoogleGenAI({ apiKey: apiKey });
-        return ai;
-    } catch (error) {
-        console.error("Error fatal al inicializar el cliente de GoogleGenAI:", error);
-        throw new Error("No se pudo inicializar el cliente de IA. Comprueba la configuración de la clave API.");
-    }
+    // The guide recommends creating a new instance right before an API call
+    // to ensure it uses the most up-to-date API key provided by the execution environment.
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    return ai;
 };
 
 
@@ -70,4 +42,42 @@ export const getSyllables = async (word: string): Promise<string[]> => {
 
     // Si la respuesta no es como se esperaba, lanza un error.
     throw new Error("La API devolvió un formato de sílabas inesperado.");
+};
+
+/**
+ * Valida si una palabra existe en español usando la API de Gemini.
+ * @param word La palabra a validar.
+ * @returns Una promesa que resuelve a un booleano.
+ */
+export const validateWord = async (word: string): Promise<boolean> => {
+    const aiClient = getAiClient();
+    const prompt = `La palabra introducida es "${word}". ¿Es una palabra válida en español, ignorando la posible falta de tildes? Responde únicamente con "true" o "false".`;
+    
+    const response = await aiClient.models.generateContent({ model, contents: prompt });
+    const text = response.text.trim().toLowerCase();
+
+    if (text !== 'true' && text !== 'false') {
+        throw new Error("Respuesta de validación inesperada de la API.");
+    }
+
+    return text === 'true';
+};
+
+/**
+ * Obtiene una palabra inicial para el juego usando la API de Gemini.
+ * @returns Una promesa que resuelve a una palabra común en español de dos sílabas.
+ */
+export const getStartingWord = async (): Promise<string> => {
+    const aiClient = getAiClient();
+    const prompt = `Dame una palabra común en español de dos sílabas que sea fácil para empezar un juego de palabras. Responde únicamente con la palabra en minúsculas.`;
+    
+    const response = await aiClient.models.generateContent({ model, contents: prompt });
+    const startingWord = response.text.trim();
+    
+    // Validación básica para asegurar que recibimos una sola palabra.
+    if (startingWord && !startingWord.includes(' ')) {
+        return startingWord;
+    }
+
+    throw new Error("La API devolvió una palabra inicial con formato incorrecto.");
 };
