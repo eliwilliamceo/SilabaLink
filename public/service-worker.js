@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'silabalink-cache-v6';
+const CACHE_NAME = 'silabalink-cache-v7';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -8,7 +8,8 @@ const urlsToCache = [
   '/favicon.ico',
   '/icons/apple-touch-icon.png',
   '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png'
+  '/icons/icon-512x512.png',
+  '/es_dictionary.json'
   // Los assets principales de la app están ahora precacheados.
   // El resto de peticiones (como los scripts de la CDN) se cachearán dinámicamente.
 ];

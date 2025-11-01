@@ -1,4 +1,4 @@
-export type GameStatus = 'INITIAL' | 'PLAYING' | 'VALIDATING' | 'GAME_OVER';
+export type GameStatus = 'LOADING' | 'INITIAL' | 'STARTING' | 'PLAYING' | 'GAME_OVER';
 
 export interface Achievement {
     id: string;

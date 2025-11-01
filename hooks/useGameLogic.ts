@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getSyllables } from '../services/geminiService';
-import { WordListService } from '../services/wordListService';
-import type { GameStatus, Achievement, LeaderboardEntry } from '../types';
+import { getStartingWord } from '../services/geminiService';
+import { getSyllablesLocally } from '../services/syllableService';
+import type { GameStatus, Achievement } from '../types';
 import { allAchievements } from '../data/achievements';
 import { getLeaderboard, saveToLeaderboard, getUnlockedAchievements, saveUnlockedAchievements } from '../utils/storage';
 
@@ -9,8 +9,8 @@ const INITIAL_TIME = 60;
 const TIME_BONUS_PER_WORD = 3;
 const LEADERBOARD_SIZE = 10;
 
-export const useGameLogic = (username: string | null) => {
-    const [status, setStatus] = useState<GameStatus>('INITIAL');
+export const useGameLogic = (username: string | null, onApiKeyError: () => void) => {
+    const [status, setStatus] = useState<GameStatus>('LOADING');
     const [timeRemaining, setTimeRemaining] = useState(INITIAL_TIME);
     const [score, setScore] = useState(0);
     const [streak, setStreak] = useState(0);
@@ -24,17 +24,28 @@ export const useGameLogic = (username: string | null) => {
 
     const timerRef = useRef<number | null>(null);
     const notificationTimeoutRef = useRef<number | null>(null);
+    const dictionaryRef = useRef<Set<string> | null>(null);
 
-     useEffect(() => {
+    useEffect(() => {
+        const loadDictionary = async () => {
+            try {
+                const response = await fetch('/es_dictionary.json');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const words = await response.json();
+                dictionaryRef.current = new Set(words);
+                setStatus('INITIAL');
+            } catch (error) {
+                console.error("Failed to load dictionary:", error);
+                setErrorMessage("No se pudo cargar el diccionario. Por favor, recarga la página.");
+            }
+        };
+        loadDictionary();
         setUnlockedAchievements(getUnlockedAchievements());
-        // Load the word list when the component mounts
-        WordListService.load().catch(console.error);
     }, []);
 
     const checkAchievements = useCallback((currentScore: number, currentStreak: number, word: string) => {
         allAchievements.forEach(achievement => {
             if (!unlockedAchievements.has(achievement.id) && achievement.check(currentScore, currentStreak, word)) {
-                // FIX: Explicitly type the new Set as Set<string> to avoid incorrect type inference.
                 const newUnlocked = new Set<string>(unlockedAchievements).add(achievement.id);
                 setUnlockedAchievements(newUnlocked);
                 saveUnlockedAchievements(newUnlocked);
@@ -53,7 +64,10 @@ export const useGameLogic = (username: string | null) => {
     const handleError = useCallback((error: unknown, defaultMessage: string): string => {
         let displayMessage = defaultMessage;
         if (error instanceof Error) {
-            // General API key configuration error.
+            if (error.message.includes("Requested entity was not found")) {
+                onApiKeyError();
+                return "La clave API no es válida. Por favor, selecciona una clave de nuevo.";
+            }
             if (error.message.toLowerCase().includes("api key")) {
                 displayMessage = "Error de configuración: La clave API de Gemini no está disponible o no es válida.";
             } else {
@@ -61,18 +75,22 @@ export const useGameLogic = (username: string | null) => {
             }
         }
         return displayMessage;
-    }, []);
+    }, [onApiKeyError]);
 
     const startGame = useCallback(async () => {
-        setStatus('VALIDATING');
+        setStatus('STARTING');
         setIsHighScore(false);
         setErrorMessage(null);
         try {
-            const startWord = WordListService.getRandomWord();
-            if (!startWord) {
-                throw new Error("La lista de palabras no está cargada.");
+            const startWord = await getStartingWord();
+            const syllables = getSyllablesLocally(startWord);
+            
+            if (syllables.length < 2) {
+                // If the starting word is invalid, try again.
+                console.warn("Starting word had less than 2 syllables, retrying...");
+                startGame();
+                return;
             }
-            const syllables = await getSyllables(startWord);
 
             setWordChain([startWord]);
             setUsedWords(new Set([startWord.toLowerCase()]));
@@ -147,62 +165,50 @@ export const useGameLogic = (username: string | null) => {
         setIsHighScore(false);
     }, []);
 
-    const handleSubmitWord = useCallback(async (word: string) => {
+    const handleSubmitWord = useCallback((word: string) => {
         const trimmedWord = word.trim().toLowerCase();
         if (!trimmedWord) return;
 
         setErrorMessage(null);
-        setStatus('VALIDATING');
 
         if (usedWords.has(trimmedWord)) {
             setErrorMessage('¡Palabra repetida!');
             setStreak(0);
-            setStatus('PLAYING');
             return;
         }
         
-        if (!WordListService.isValidWord(trimmedWord)) {
+        if (!dictionaryRef.current?.has(trimmedWord)) {
             setErrorMessage('¡Esa palabra no existe!');
             setStreak(0);
-            setStatus('PLAYING');
             return;
         }
 
-        try {
-            const syllables = await getSyllables(trimmedWord);
-            if (syllables.length < 2) {
-                setErrorMessage('La palabra debe tener al menos 2 sílabas.');
-                setStreak(0);
-                setStatus('PLAYING');
-                return;
-            }
-
-            const firstSyllable = syllables[0];
-            if (firstSyllable.toLowerCase() !== lastSyllable.toLowerCase()) {
-                setErrorMessage(`La palabra debe empezar con "${lastSyllable}"`);
-                setStreak(0);
-                setStatus('PLAYING');
-                return;
-            }
-
-            const newStreak = streak + 1;
-            const newScore = score + 10 + (trimmedWord.length > 5 ? 5 : 0) + newStreak * 2;
-            
-            setScore(newScore);
-            setStreak(newStreak);
-            setTimeRemaining(prev => prev + TIME_BONUS_PER_WORD);
-            setWordChain(prev => [...prev, trimmedWord]);
-            setUsedWords(prev => new Set(prev).add(trimmedWord));
-            setLastSyllable(syllables[syllables.length - 1]);
-            checkAchievements(newScore, newStreak, trimmedWord);
-            setStatus('PLAYING');
-        } catch (error) {
-             const displayMessage = handleError(error, "Error al procesar la palabra.");
-            setErrorMessage(displayMessage);
-            setStatus('PLAYING'); // Return to playing state
+        const syllables = getSyllablesLocally(trimmedWord);
+        if (syllables.length < 2) {
+            setErrorMessage('La palabra debe tener al menos 2 sílabas.');
+            setStreak(0);
+            return;
         }
 
-    }, [lastSyllable, score, streak, usedWords, checkAchievements, handleError]);
+        const firstSyllable = syllables[0];
+        if (firstSyllable.toLowerCase() !== lastSyllable.toLowerCase()) {
+            setErrorMessage(`La palabra debe empezar con "${lastSyllable}"`);
+            setStreak(0);
+            return;
+        }
+
+        const newStreak = streak + 1;
+        const newScore = score + 10 + (trimmedWord.length > 5 ? 5 : 0) + newStreak * 2;
+        
+        setScore(newScore);
+        setStreak(newStreak);
+        setTimeRemaining(prev => prev + TIME_BONUS_PER_WORD);
+        setWordChain(prev => [...prev, trimmedWord]);
+        setUsedWords(prev => new Set(prev).add(trimmedWord));
+        setLastSyllable(syllables[syllables.length - 1]);
+        checkAchievements(newScore, newStreak, trimmedWord);
+
+    }, [lastSyllable, score, streak, usedWords, checkAchievements]);
     
     return {
         status,
