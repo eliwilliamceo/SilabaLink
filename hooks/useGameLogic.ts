@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getSyllables, validateWord, getStartingWord } from '../services/geminiService';
+import { getSyllables } from '../services/geminiService';
+import { WordListService } from '../services/wordListService';
 import type { GameStatus, Achievement, LeaderboardEntry } from '../types';
 import { allAchievements } from '../data/achievements';
 import { getLeaderboard, saveToLeaderboard, getUnlockedAchievements, saveUnlockedAchievements } from '../utils/storage';
@@ -8,7 +9,7 @@ const INITIAL_TIME = 60;
 const TIME_BONUS_PER_WORD = 3;
 const LEADERBOARD_SIZE = 10;
 
-export const useGameLogic = (username: string | null, onApiKeyError: () => void) => {
+export const useGameLogic = (username: string | null) => {
     const [status, setStatus] = useState<GameStatus>('INITIAL');
     const [timeRemaining, setTimeRemaining] = useState(INITIAL_TIME);
     const [score, setScore] = useState(0);
@@ -26,6 +27,8 @@ export const useGameLogic = (username: string | null, onApiKeyError: () => void)
 
      useEffect(() => {
         setUnlockedAchievements(getUnlockedAchievements());
+        // Load the word list when the component mounts
+        WordListService.load().catch(console.error);
     }, []);
 
     const checkAchievements = useCallback((currentScore: number, currentStreak: number, word: string) => {
@@ -50,12 +53,6 @@ export const useGameLogic = (username: string | null, onApiKeyError: () => void)
     const handleError = useCallback((error: unknown, defaultMessage: string): string => {
         let displayMessage = defaultMessage;
         if (error instanceof Error) {
-            // Specific check for invalid API key after selection, which can happen in a race condition.
-            if (error.message.includes("Requested entity was not found")) {
-                onApiKeyError();
-                // Return a message, although the UI will change immediately.
-                return "La clave API no es válida. Por favor, selecciona una clave de nuevo.";
-            }
             // General API key configuration error.
             if (error.message.toLowerCase().includes("api key")) {
                 displayMessage = "Error de configuración: La clave API de Gemini no está disponible o no es válida.";
@@ -64,14 +61,17 @@ export const useGameLogic = (username: string | null, onApiKeyError: () => void)
             }
         }
         return displayMessage;
-    }, [onApiKeyError]);
+    }, []);
 
     const startGame = useCallback(async () => {
         setStatus('VALIDATING');
         setIsHighScore(false);
         setErrorMessage(null);
         try {
-            const startWord = await getStartingWord();
+            const startWord = WordListService.getRandomWord();
+            if (!startWord) {
+                throw new Error("La lista de palabras no está cargada.");
+            }
             const syllables = await getSyllables(startWord);
 
             setWordChain([startWord]);
@@ -161,15 +161,14 @@ export const useGameLogic = (username: string | null, onApiKeyError: () => void)
             return;
         }
         
-        try {
-            const isValid = await validateWord(trimmedWord);
-            if (!isValid) {
-                setErrorMessage('¡Esa palabra no existe!');
-                setStreak(0);
-                setStatus('PLAYING');
-                return;
-            }
+        if (!WordListService.isValidWord(trimmedWord)) {
+            setErrorMessage('¡Esa palabra no existe!');
+            setStreak(0);
+            setStatus('PLAYING');
+            return;
+        }
 
+        try {
             const syllables = await getSyllables(trimmedWord);
             if (syllables.length < 2) {
                 setErrorMessage('La palabra debe tener al menos 2 sílabas.');
@@ -198,7 +197,7 @@ export const useGameLogic = (username: string | null, onApiKeyError: () => void)
             checkAchievements(newScore, newStreak, trimmedWord);
             setStatus('PLAYING');
         } catch (error) {
-             const displayMessage = handleError(error, "Error al validar la palabra.");
+             const displayMessage = handleError(error, "Error al procesar la palabra.");
             setErrorMessage(displayMessage);
             setStatus('PLAYING'); // Return to playing state
         }

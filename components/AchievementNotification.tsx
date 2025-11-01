@@ -26,12 +26,12 @@ const AchievementNotification: React.FC<AchievementNotificationProps> = ({ achie
     const animationClass = visible ? 'animate-toast-in' : 'animate-toast-out';
 
     return (
-        <div className={`fixed bottom-5 left-1/2 -translate-x-1/2 w-full max-w-sm p-4 z-50 ${animationClass}`}>
-            <div className="bg-gradient-to-r from-cyan-500 to-pink-500 rounded-lg shadow-2xl p-4 flex items-center space-x-4">
-                <div className="text-4xl">{achievement.icon}</div>
+        <div className={`achievement-notification ${animationClass}`}>
+            <div className="notification-content">
+                <div className="notification-icon">{achievement.icon}</div>
                 <div>
-                    <h3 className="font-bold text-slate-900">¡Logro Desbloqueado!</h3>
-                    <p className="text-slate-800">{achievement.name}</p>
+                    <h3 className="notification-title">¡Logro Desbloqueado!</h3>
+                    <p className="notification-description">{achievement.name}</p>
                 </div>
             </div>
         </div>

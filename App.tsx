@@ -10,13 +10,9 @@ import LoginScreen from './components/LoginScreen';
 import { getCurrentUser, saveCurrentUser, clearCurrentUser } from './utils/storage';
 
 const App: React.FC = () => {
-    const [appState, setAppState] = useState<'SPLASH' | 'API_KEY' | 'LOGIN' | 'GAME'>('SPLASH');
+    const [appState, setAppState] = useState<'SPLASH' | 'LOGIN' | 'GAME'>('SPLASH');
     const [currentUser, setCurrentUser] = useState<string | null>(null);
     
-    const handleApiKeyError = () => {
-        setAppState('API_KEY');
-    };
-
     const {
         status,
         timeRemaining,
@@ -31,20 +27,13 @@ const App: React.FC = () => {
         achievementNotification,
         unlockedAchievements,
         isHighScore,
-    } = useGameLogic(currentUser, handleApiKeyError);
+    } = useGameLogic(currentUser);
     
     const [showAchievements, setShowAchievements] = useState(false);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
 
     useEffect(() => {
-        const checkApiKeyAndUser = async () => {
-            // @ts-ignore - aistudio is available in the execution environment.
-            const hasApiKey = await window.aistudio.hasSelectedApiKey();
-            if (!hasApiKey) {
-                setAppState('API_KEY');
-                return;
-            }
-            
+        const checkUser = () => {
             const user = getCurrentUser();
             if (user) {
                 setCurrentUser(user);
@@ -55,22 +44,11 @@ const App: React.FC = () => {
         };
         
         const splashTimer = setTimeout(() => {
-            checkApiKeyAndUser();
+            checkUser();
         }, 2500);
 
         return () => clearTimeout(splashTimer);
     }, []);
-
-    const handleKeySelected = () => {
-        // Assume key is selected, move to next state.
-        const user = getCurrentUser();
-        if (user) {
-            setCurrentUser(user);
-            setAppState('GAME');
-        } else {
-            setAppState('LOGIN');
-        }
-    };
 
     const handleLogin = (name: string) => {
         setCurrentUser(name);
@@ -92,41 +70,6 @@ const App: React.FC = () => {
     
     if (appState === 'SPLASH') {
         return <SplashScreen />;
-    }
-
-    if (appState === 'API_KEY') {
-        return (
-            <div className="login-screen">
-                <div className="login-wrapper">
-                    <header>
-                        <h1 className="app-title">
-                            Sílaba<span className="app-title--highlight">Link</span>
-                        </h1>
-                        <p className="user-greeting" style={{marginTop: '1rem', lineHeight: '1.5'}}>
-                            Para poder comunicarnos con el modelo de IA de Gemini, necesitamos que selecciones una clave API.
-                        </p>
-                    </header>
-                    <div className="login-form">
-                        <button
-                            onClick={async () => {
-                                // @ts-ignore - aistudio is available in the execution environment.
-                                await window.aistudio.openSelectKey();
-                                handleKeySelected();
-                            }}
-                            className="btn btn-primary"
-                        >
-                            Seleccionar Clave API
-                        </button>
-                         <p style={{marginTop: '1.5rem', fontSize: '0.875rem', color: 'var(--color-slate-400)', textAlign: 'center', lineHeight: '1.5'}}>
-                             Asegúrate de tener la facturación habilitada para tu proyecto. <br/>
-                             <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" style={{color: 'var(--color-cyan-400)', textDecoration: 'underline'}}>
-                                 Más información sobre la facturación
-                             </a>
-                         </p>
-                    </div>
-                </div>
-            </div>
-        );
     }
 
     if (appState === 'LOGIN') {

@@ -14,27 +14,27 @@ const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ onClose }) => {
     }, []);
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" onClick={onClose}>
-            <div className="bg-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-md animate-fade-in-up" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl font-bold text-cyan-400">Mejores Puntuaciones</h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-white text-3xl">&times;</button>
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h2 className="modal-title">Mejores Puntuaciones</h2>
+                    <button onClick={onClose} className="close-button">&times;</button>
                 </div>
-                <div className="max-h-[60vh] overflow-y-auto pr-2">
+                <div className="modal-body">
                     {leaderboard.length > 0 ? (
-                        <ol className="space-y-2">
+                        <ol className="leaderboard-list">
                             {leaderboard.map((entry, index) => (
-                                <li key={index} className="flex justify-between items-center p-3 bg-slate-700/50 rounded-lg">
-                                    <div className="flex items-center">
-                                        <span className="text-lg font-bold w-8 text-slate-400">{index + 1}.</span>
-                                        <span className="font-semibold text-white">{entry.name}</span>
+                                <li key={index} className="leaderboard-item">
+                                    <div className="leaderboard-rank-name">
+                                        <span className="leaderboard-rank">{index + 1}.</span>
+                                        <span className="leaderboard-name">{entry.name}</span>
                                     </div>
-                                    <span className="font-bold text-xl text-cyan-400">{entry.score}</span>
+                                    <span className="leaderboard-score">{entry.score}</span>
                                 </li>
                             ))}
                         </ol>
                     ) : (
-                        <p className="text-center text-slate-400 py-8">Aún no hay puntuaciones. ¡Sé el primero!</p>
+                        <p className="empty-state-message">Aún no hay puntuaciones. ¡Sé el primero!</p>
                     )}
                 </div>
             </div>
