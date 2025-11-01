@@ -1,4 +1,4 @@
-import silabas from 'silaba.js';
+import silabas from 'silaba';
 
 /**
  * Splits a word into syllables using a local library.

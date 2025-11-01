@@ -14,18 +14,5 @@ export default defineConfig(({ mode }) => {
             // Esto permite que el código siga usando process.env.API_KEY
             'process.env.API_KEY': JSON.stringify(env.API_KEY),
         },
-        build: {
-            rollupOptions: {
-                // No intentes empaquetar estos módulos.
-                // Se cargan a través del importmap en index.html en el navegador.
-                external: [
-                    '@google/genai',
-                    'react',
-                    'react-dom',
-                    'react/jsx-runtime', // Añadido para resolver el error de build
-                    'react-dom/client'   // Añadido preventivamente ya que se usa en index.tsx
-                ],
-            },
-        },
     };
 });
