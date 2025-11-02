@@ -14,12 +14,7 @@ interface LeaderboardEntry {
 }
 
 declare module 'silabas' {
-  interface SyllableInfo {
-    syllable: string;
-  }
-  interface SilabasResult {
-    syllables: SyllableInfo[];
-  }
-  function silabas(word: string): SilabasResult;
+  // The 'silabas' library is async and returns a promise with an array of strings.
+  function silabas(word: string): Promise<string[]>;
   export default silabas;
 }

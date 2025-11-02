@@ -82,7 +82,7 @@ export const useGameLogic = (username: string | null, onApiKeyError: () => void)
         setErrorMessage(null);
         try {
             const startWord = await getStartingWord();
-            const syllables = getSyllablesLocally(startWord);
+            const syllables = await getSyllablesLocally(startWord);
             
             if (syllables.length < 2) {
                 // If the starting word is invalid, try again.
@@ -164,7 +164,7 @@ export const useGameLogic = (username: string | null, onApiKeyError: () => void)
         setIsHighScore(false);
     }, []);
 
-    const handleSubmitWord = useCallback((word: string) => {
+    const handleSubmitWord = useCallback(async (word: string) => {
         const trimmedWord = word.trim().toLowerCase();
         if (!trimmedWord) return;
 
@@ -182,7 +182,7 @@ export const useGameLogic = (username: string | null, onApiKeyError: () => void)
             return;
         }
 
-        const syllables = getSyllablesLocally(trimmedWord);
+        const syllables = await getSyllablesLocally(trimmedWord);
         if (syllables.length < 2) {
             setErrorMessage('La palabra debe tener al menos 2 sílabas.');
             setStreak(0);
