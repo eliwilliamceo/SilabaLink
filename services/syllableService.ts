@@ -1,4 +1,4 @@
-import silabas from 'silaba';
+import silabas from 'silabas';
 
 /**
  * Splits a word into syllables using a local library.

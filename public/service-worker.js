@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'silabalink-cache-v8';
+const CACHE_NAME = 'silabalink-cache-v9';
 const urlsToCache = [
   '/',
   '/index.html',
