@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import type { LeaderboardEntry } from '../types';
 import { getLeaderboard } from '../utils/storage';
 
 interface LeaderboardModalProps {

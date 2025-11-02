@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getStartingWord } from '../services/geminiService';
 import { getSyllablesLocally } from '../services/syllableService';
-import type { GameStatus, Achievement } from '../types';
 import { allAchievements } from '../data/achievements';
 import { getLeaderboard, saveToLeaderboard, getUnlockedAchievements, saveUnlockedAchievements } from '../utils/storage';
 

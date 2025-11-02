@@ -1,5 +1,3 @@
-import type { LeaderboardEntry } from '../types';
-
 const LEADERBOARD_KEY = 'silabaLinkLeaderboard';
 const ACHIEVEMENTS_KEY = 'silabaLinkAchievements';
 const LEADERBOARD_SIZE = 10;

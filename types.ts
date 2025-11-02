@@ -1,6 +1,6 @@
-export type GameStatus = 'LOADING' | 'INITIAL' | 'STARTING' | 'PLAYING' | 'GAME_OVER';
+type GameStatus = 'LOADING' | 'INITIAL' | 'STARTING' | 'PLAYING' | 'GAME_OVER';
 
-export interface Achievement {
+interface Achievement {
     id: string;
     name: string;
     description: string;
@@ -8,7 +8,18 @@ export interface Achievement {
     check: (score: number, streak: number, word: string) => boolean;
 }
 
-export interface LeaderboardEntry {
+interface LeaderboardEntry {
     name: string;
     score: number;
+}
+
+declare module 'silabas' {
+  interface SyllableInfo {
+    syllable: string;
+  }
+  interface SilabasResult {
+    syllables: SyllableInfo[];
+  }
+  function silabas(word: string): SilabasResult;
+  export default silabas;
 }

@@ -27,7 +27,7 @@ export const getStartingWord = async (): Promise<string> => {
     const prompt = `Dame una palabra común en español de dos sílabas que sea fácil para empezar un juego de palabras. Responde únicamente con la palabra en minúsculas.`;
     
     const response = await aiClient.models.generateContent({ model, contents: prompt });
-    const startingWord = response.text.trim();
+    const startingWord = (response.text ?? '').trim();
     
     // Validación básica para asegurar que recibimos una sola palabra.
     if (startingWord && !startingWord.includes(' ')) {
