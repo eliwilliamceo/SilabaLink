@@ -8,7 +8,7 @@ const INITIAL_TIME = 60;
 const TIME_BONUS_PER_WORD = 3;
 const LEADERBOARD_SIZE = 10;
 
-export const useGameLogic = (username: string | null, onApiKeyError: () => void) => {
+export const useGameLogic = (username: string | null) => {
     const [status, setStatus] = useState<GameStatus>('LOADING');
     const [timeRemaining, setTimeRemaining] = useState(INITIAL_TIME);
     const [score, setScore] = useState(0);
@@ -63,9 +63,8 @@ export const useGameLogic = (username: string | null, onApiKeyError: () => void)
     const handleError = useCallback((error: unknown, defaultMessage: string): string => {
         let displayMessage = defaultMessage;
         if (error instanceof Error) {
-            if (error.message.includes("Requested entity was not found")) {
-                onApiKeyError();
-                return "La clave API no es válida. Por favor, selecciona una clave de nuevo.";
+            if (error.message.includes("API key not valid") || error.message.includes("Requested entity was not found")) {
+                return "La clave API no es válida o no está configurada. Asegúrate de que la variable de entorno API_KEY esté correctamente establecida.";
             }
             if (error.message.toLowerCase().includes("api key")) {
                 displayMessage = "Error de configuración: La clave API de Gemini no está disponible o no es válida.";
@@ -74,7 +73,7 @@ export const useGameLogic = (username: string | null, onApiKeyError: () => void)
             }
         }
         return displayMessage;
-    }, [onApiKeyError]);
+    }, []);
 
     const startGame = useCallback(async () => {
         setStatus('STARTING');

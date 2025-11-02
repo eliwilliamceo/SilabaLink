@@ -10,14 +10,9 @@ import LoginScreen from './components/LoginScreen';
 import { getCurrentUser, saveCurrentUser, clearCurrentUser } from './utils/storage';
 
 const App: React.FC = () => {
-    const [appState, setAppState] = useState<'SPLASH' | 'API_KEY' | 'LOGIN' | 'GAME'>('SPLASH');
+    const [appState, setAppState] = useState<'SPLASH' | 'LOGIN' | 'GAME'>('SPLASH');
     const [currentUser, setCurrentUser] = useState<string | null>(null);
-    const [apiKeyScreenError, setApiKeyScreenError] = useState<string | null>(null);
     
-    const handleApiKeyError = () => {
-        setAppState('API_KEY');
-    };
-
     const {
         status,
         timeRemaining,
@@ -32,68 +27,24 @@ const App: React.FC = () => {
         achievementNotification,
         unlockedAchievements,
         isHighScore,
-    } = useGameLogic(currentUser, handleApiKeyError);
+    } = useGameLogic(currentUser);
     
     const [showAchievements, setShowAchievements] = useState(false);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
 
     useEffect(() => {
         const splashTimer = setTimeout(() => {
-            let attempts = 0;
-            const maxAttempts = 50; // Poll for 5 seconds (50 * 100ms)
-
-            const checkForApiKey = () => {
-                attempts++;
-                // @ts-ignore - aistudio is available in the execution environment.
-                const aistudio = window.aistudio;
-
-                if (aistudio && typeof aistudio.hasSelectedApiKey === 'function') {
-                    // aistudio is available, check for the key
-                    aistudio.hasSelectedApiKey()
-                        .then((hasKey: boolean) => {
-                            if (hasKey) {
-                                const user = getCurrentUser();
-                                if (user) {
-                                    setCurrentUser(user);
-                                    setAppState('GAME');
-                                } else {
-                                    setAppState('LOGIN');
-                                }
-                            } else {
-                                setAppState('API_KEY');
-                            }
-                        })
-                        .catch((error: any) => {
-                            console.error("Error checking for API key:", error);
-                            setAppState('API_KEY'); // Proceed to manual selection on error
-                        });
-                } else if (attempts < maxAttempts) {
-                    // aistudio not ready, poll again
-                    setTimeout(checkForApiKey, 100);
-                } else {
-                    // Timeout reached, aistudio not available
-                    console.error("AI Studio environment not detected after 5 seconds.");
-                    setApiKeyScreenError("No se pudo conectar con el entorno de ejecución. Por favor, recarga la página.");
-                    setAppState('API_KEY');
-                }
-            };
-
-            checkForApiKey();
+            const user = getCurrentUser();
+            if (user) {
+                setCurrentUser(user);
+                setAppState('GAME');
+            } else {
+                setAppState('LOGIN');
+            }
         }, 2000);
 
         return () => clearTimeout(splashTimer);
     }, []);
-
-    const handleKeySelected = () => {
-        // Assume key is selected, move to next state.
-        const user = getCurrentUser();
-        if (user) {
-            setCurrentUser(user);
-            setAppState('GAME');
-        } else {
-            setAppState('LOGIN');
-        }
-    };
 
     const handleLogin = (name: string) => {
         setCurrentUser(name);
@@ -115,53 +66,6 @@ const App: React.FC = () => {
     
     if (appState === 'SPLASH') {
         return <SplashScreen />;
-    }
-
-    if (appState === 'API_KEY') {
-        return (
-            <div className="login-screen">
-                <div className="login-wrapper">
-                    <header>
-                        <h1 className="app-title">
-                            Sílaba<span className="app-title--highlight">Link</span>
-                        </h1>
-                        <p className="user-greeting" style={{marginTop: '1rem', lineHeight: '1.5'}}>
-                            Para poder comunicarnos con el modelo de IA de Gemini, necesitamos que selecciones una clave API.
-                        </p>
-                    </header>
-                    <div className="login-form">
-                        <button
-                            onClick={async () => {
-                                setApiKeyScreenError(null);
-                                // @ts-ignore - aistudio is available in the execution environment.
-                                const aistudio = window.aistudio;
-                                if (aistudio && typeof aistudio.openSelectKey === 'function') {
-                                    try {
-                                        await aistudio.openSelectKey();
-                                        handleKeySelected();
-                                    } catch (err) {
-                                        console.error("Error opening API key selection:", err);
-                                        setApiKeyScreenError("Ocurrió un error al intentar seleccionar la clave API.");
-                                    }
-                                } else {
-                                    setApiKeyScreenError("La función para seleccionar la clave API no está disponible. Recarga la página.");
-                                }
-                            }}
-                            className="btn btn-primary"
-                        >
-                            Seleccionar Clave API
-                        </button>
-                        {apiKeyScreenError && <p className="error-message" style={{marginTop: '1rem'}}>{apiKeyScreenError}</p>}
-                         <p style={{marginTop: '1.5rem', fontSize: '0.875rem', color: 'var(--color-slate-400)', textAlign: 'center', lineHeight: '1.5'}}>
-                             Asegúrate de tener la facturación habilitada para tu proyecto. <br/>
-                             <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" style={{color: 'var(--color-cyan-400)', textDecoration: 'underline'}}>
-                                 Más información sobre la facturación
-                             </a>
-                         </p>
-                    </div>
-                </div>
-            </div>
-        );
     }
 
     if (appState === 'LOGIN') {
