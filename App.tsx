@@ -37,31 +37,30 @@ const App: React.FC = () => {
     const [showLeaderboard, setShowLeaderboard] = useState(false);
 
     useEffect(() => {
-        const checkApiKeyAndUser = async () => {
-            try {
-                // @ts-ignore - aistudio is available in the execution environment.
-                const hasApiKey = await window.aistudio.hasSelectedApiKey();
-                if (!hasApiKey) {
-                    setAppState('API_KEY');
-                    return;
-                }
-            } catch (error) {
-                console.error("Could not verify API key, prompting user to select one.", error);
-                setAppState('API_KEY');
-                return;
-            }
-            
-            const user = getCurrentUser();
-            if (user) {
-                setCurrentUser(user);
-                setAppState('GAME');
-            } else {
-                setAppState('LOGIN');
-            }
-        };
-        
         const splashTimer = setTimeout(() => {
-            checkApiKeyAndUser();
+            // @ts-ignore - aistudio is available in the execution environment.
+            const aistudio = window.aistudio;
+
+            // Use a promise chain for safer handling of potentially undefined objects.
+            Promise.resolve(aistudio?.hasSelectedApiKey?.())
+                .then(hasApiKey => {
+                    if (!hasApiKey) {
+                        setAppState('API_KEY');
+                        return;
+                    }
+                    
+                    const user = getCurrentUser();
+                    if (user) {
+                        setCurrentUser(user);
+                        setAppState('GAME');
+                    } else {
+                        setAppState('LOGIN');
+                    }
+                })
+                .catch(error => {
+                    console.error("Could not verify API key, prompting user to select one.", error);
+                    setAppState('API_KEY');
+                });
         }, 2500);
 
         return () => clearTimeout(splashTimer);
