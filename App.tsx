@@ -38,9 +38,15 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const checkApiKeyAndUser = async () => {
-            // @ts-ignore - aistudio is available in the execution environment.
-            const hasApiKey = await window.aistudio.hasSelectedApiKey();
-            if (!hasApiKey) {
+            try {
+                // @ts-ignore - aistudio is available in the execution environment.
+                const hasApiKey = await window.aistudio.hasSelectedApiKey();
+                if (!hasApiKey) {
+                    setAppState('API_KEY');
+                    return;
+                }
+            } catch (error) {
+                console.error("Could not verify API key, prompting user to select one.", error);
                 setAppState('API_KEY');
                 return;
             }

@@ -5,7 +5,6 @@ const urlsToCache = [
   '/index.html',
   '/index.css',
   '/manifest.json',
-  '/favicon.ico',
   '/icons/apple-touch-icon.png',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
